@@ -9,6 +9,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "express": "^4.10.1",
+    "logfmt": "^1.2.0",
     "node-statsd": "sivy/node-statsd"
   }
 }

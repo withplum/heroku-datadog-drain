@@ -1,66 +1,88 @@
-var net = require('net');
-var statsd = require('./statsd');
+// TODO: Include node-oz-helpers's statsd.
+var logfmt = require('logfmt');
+var express = require('express');
+var bodyParser = require('body-parser');
+var _ = require('lodash');
+var util = require('util');
 
-var PORT = 9050;
-var LINE_REGEX = /^([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) - - (.+)$/;
-var FLIPP_REGEX = /path=\"([^\"]+)\"/;
+var app = express();
 
-var server = net.createServer();
+/*
+ HEROKU HEADERS:
 
-server.on('listening', function () {
-  console.log('listening on port: ' + PORT);
+ { host: 'ec2-54-77-170-118.eu-west-1.compute.amazonaws.com:9050',
+ 'content-type': 'application/logplex-1',
+ 'logplex-msg-count': '1',
+ 'logplex-frame-id': '29E4DC52AC72B85FB3CB7D9087D19DD6',
+ 'logplex-drain-token': 'd.c63ab66f-d67a-468d-af6e-fb4589b75318',
+ 'user-agent': 'Logplex/v75.1',
+ 'content-length': '207' }
+ */
+
+
+// Parsing this stuff:
+// 300 <45>1 2014-10-29T12:49:59.928087+00:00 host heroku web.2 - <message>
+var REGEX_LOGFMT = new RegExp('([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) ([^ ]+) (.*)');
+
+app.use(bodyParser.text({ type: 'application/logplex-1' }));
+
+app.get('/', function (req, res) {
+  console.log('GET: ' + req.path);
+  res.status(200).end();
 });
 
-server.on('connection', function (sock) {
-  sock.setNoDelay(true);
-  sock.setEncoding('ascii');
+app.post('/', function (req, res) {
+  var noOfLines = Number(req.headers['logplex-msg-count']);
+  console.log('> handling ' + noOfLines + ' lines!');
+  if (noOfLines > 1) {
+    // TODO: Get rid of the last line.
+    var lines = req.body.split('\n');
+    lines.forEach(function (line) {
+      handleLine(line);
+    });
+  } else if (noOfLines === 1) {
+    handleLine(req.body);
+  } else {
+    console.log('what?');
+  }
 
-  sock.on('data', function (data) {
-    var lines = data.split('\n');
-    for (var i = 0; i < lines.length; i++) {
-      var matched = lines[i].match(LINE_REGEX);
-      if (matched) {
-        console.log(matched[4] + '\t' + matched[6] + '\t' + matched[7]);
-        var message = matched[7];
-        if (message.indexOf('method=GET') > 0) {
-          var flipp = message.match(FLIPP_REGEX);
-          if (flipp) {
-            console.log(flipp[1]);
-            statsd.increment('request', 1.0, ['endpoint:' + flipp[1]]);
-          }
-        }
+  res.status(200).end();
+});
+
+function handleLine(line) {
+  var match = line.match(REGEX_LOGFMT);
+  if (match !== null) {
+    var object = mapToObject(match);
+    var json = parseAsJson(object.message);
+    if (json !== null) {
+      console.log('was json:', json);
+    } else {
+      var fmt = logfmt.parse(object.message);
+      // Is it a request handling log line?
+      if (_.has(fmt, 'method') && _.has(fmt, 'status')) {
+        var line = util.format('%s=%s', 'method', logfmt.method, 'status', logfmt.status);
+        console.log('statsd this line:', line);
       }
+      console.log('was logfmt: ', logfmtLine);
     }
-  });
+  }
+}
 
-  sock.on('end', function (data) {
-    try {
-      sock.end();
-    } catch (err) {
-      console.log('on end: ', err);
-    }
-  });
+function parseAsJson(message) {
+  try {
+    return JSON.parse(message);
+  } catch (e) {
+    return null;
+  }
+}
 
-  sock.on('error', function (err) {
-    console.log('error hit: ', err);
-  });
+function mapToObject(parsedLine) {
+  return {
+    time: parsedLine[3],
+    source: parsedLine[5],
+    dyno: parsedLine[6],
+    message: parsedLine[8]
+  };
+}
 
-  sock.on('close', function (data) {
-    try {
-      sock.end();
-      sock.destroy();
-    } catch (err) {
-      console.log(err);
-    }
-  });
-});
-
-server.on('error', function (err) {
-  console.log('server error hit: ', err)
-});
-
-server.on('close', function () {
-  console.log('server closed');
-});
-
-server.listen(PORT);
+app.listen(9050);
