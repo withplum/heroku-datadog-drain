@@ -46,12 +46,18 @@ app.listen(port, function () {
 
 
 /**
- * 
+ * Rules that specify what lines to process and how to process them
+ * {
+ *  <rule name>: {
+ *    predicate: fn(line) -> bool
+ *    process: fn(line) -> undefined
+ *  }, ..
+ * }
  */
-var metricTypes = {
+var rules = {
   dynoRuntimeMetrics: {
     predicate: function isDynoRuntimeLine (line) {
-      // Contains the keys heroku, source, dyno, sample#*
+      // Contains the keys heroku, source, dyno and sample#*
       return hasKeys(line, ['heroku', 'source', 'dyno']) && _.some(line, (_, key) => key.startsWith('sample#'));
     },
     process: function processDynoRuntimeLine (line) {
@@ -63,23 +69,31 @@ var metricTypes = {
         statsd.histogram('heroku.dyno.' + key, value, tags);
       });
     }
+  },
+
+  routerResponseMetrics: {
+    predicate: function (line) {
+      return line.at === 'info' && hasKeys(line, ['heroku', 'router', 'path', 'method', 'dyno', 'status', 'connect', 'service']);
+    },
+    process: function (line) {
+      var tags = tagsToArr(_.pick(line, ['dyno', 'method', 'status', 'path', 'host']));
+      statsd.histogram('heroku.router.request.connect', line.connect, tags);
+      statsd.histogram('heroku.router.request.service', line.service, tags);
+    }
   }
 };
 
 
 /**
- * Helper functions
- */
-
-/**
- * Matches a line against the correct metrics type and processes it accordingly
+ * Matches a line against a rule and processes it
+ * @param {object} line
  */
 function processLine (line) {
   console.log('Processing line:', line);
-  _.forEach(metricTypes, function (metricType, name) {
-    if (metricType.predicate(line)) {
+  _.forEach(rules, function (rule, name) {
+    if (rule.predicate(line)) {
       console.log('Line matches %s', name);
-      metricType.process(line);
+      rule.process(line);
       return true; // Line is processed, we don't have to keep on matching
     }
   });
@@ -111,6 +125,9 @@ function tagsToArr (tags) {
   return _.transform(tags, (arr, value, key) => arr.push(key + ':' + value), []);
 }
 
+/**
+ * Check if object contains list of keys
+ */
 function hasKeys (object, keys) {
   return _.every(keys, _.partial(_.has, object));
 }
