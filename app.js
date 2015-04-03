@@ -12,21 +12,37 @@ let statsd = new StatsD(parseStatsdUrl(process.env.STATSD_URL));
 let app = module.exports = express();
 let allowedApps = loadAllowedAppsFromEnv();
 
+if (process.env.DEBUG) {
+  console.log('Allowed apps', allowedApps);
+  statsd.send = wrap(statsd.send.bind(statsd), console.log.bind(null, 'Intercepted: statsd.send(%s):'));
+}
+
+function wrap (fn, wrapper) {
+  return function (...args) {
+    wrapper(...args);
+    fn.apply(null, args);
+  };
+}
+
 app.use(logfmt.bodyParserStream());
 app.use(function authenticate (req, res, next) {
   let auth = basicAuth(req) || {};
   let app = allowedApps[auth.name];
   if (app !== undefined && app.password === auth.pass) {
     req.defaultTags = app.tags;
+    req.prefix = app.prefix;
     next();
   } else {
     res.status(401).send('Unauthorized');
+    if (process.env.DEBUG) {
+      console.log('Unauthorized access by %s', auth.name);
+    }
   }
 });
 
 app.post('/', function (req, res) {
   if(req.body !== undefined) {
-    req.body.pipe(through(line => processLine(line, req.defaultTags)));
+    req.body.pipe(through(line => processLine(line, req.prefix, req.defaultTags)));
   }
 
   res.send('OK');
@@ -42,40 +58,56 @@ app.listen(port, function () {
  * Matches a line against a rule and processes it
  * @param {object} line
  */
-function processLine (line, defaultTags) {
+function processLine (line, prefix, defaultTags) {
   // Dyno metrics
   if (hasKeys(line, ['heroku', 'source', 'dyno'])) {
+    if (process.env.DEBUG) {
+      console.log('Processing dyno metrics');
+    }
     let tags = tagsToArr({ dyno: line.source });
     tags = _.union(tags, defaultTags);
     let metrics = _.pick(line, (_, key) => key.startsWith('sample#'));
     _.forEach(metrics, function (value, key) {
       key = key.split('#')[1];
       key = key.replace(/_/g, '.');
-      statsd.histogram('heroku.dyno.' + key, value, tags);
+      statsd.histogram(prefix + 'heroku.dyno.' + key, value, tags);
     });
   }
 
   // Router metrics
   else if (hasKeys(line, ['heroku', 'router', 'path', 'method', 'dyno', 'status', 'connect', 'service', 'at'])) {
+    if (process.env.DEBUG) {
+      console.log('Processing router metrics');
+    }
     let tags = tagsToArr(_.pick(line, ['dyno', 'method', 'status', 'path', 'host', 'code', 'desc', 'at']));
     tags = _.union(tags, defaultTags);
-    statsd.histogram('heroku.router.request.connect', line.connect, tags);
-    statsd.histogram('heroku.router.request.service', line.service, tags);
+    statsd.histogram(prefix + 'heroku.router.request.connect', line.connect, tags);
+    statsd.histogram(prefix + 'heroku.router.request.service', line.service, tags);
     if (line.at === 'error') {
-      statsd.increment('heroku.router.error', 1, tags);
+      statsd.increment(prefix + 'heroku.router.error', 1, tags);
     }
   }
 
   // Postgres metrics
   else if (hasKeys(line, ['source', 'heroku-postgres'])) {
+    if (process.env.DEBUG) {
+      console.log('Processing postgres metrics');
+    }
     let tags = tagsToArr({ source: line.source });
     tags = _.union(tags, defaultTags);
     let metrics = _.pick(line, (_, key) => key.startsWith('sample#'));
     _.forEach(metrics, function (value, key) {
       key = key.split('#')[1];
-      statsd.histogram('heroku.postgres.' + key, value, tags);
+      statsd.histogram(prefix + 'heroku.postgres.' + key, value, tags);
       // TODO: Use statsd counters or gauges for some postgres metrics (db size, table count, ..)
     });
+  }
+
+  // Default
+  else {
+    if (process.env.DEBUG) {
+      console.log('No match for line');
+    }
   }
 }
 
@@ -130,7 +162,13 @@ function loadAllowedAppsFromEnv () {
     tags = tags === undefined ? [] : tags.split(',');
     tags.push('app:' + name);
 
-    return [name, { password, tags }];
+    // Prefix
+    var prefix = process.env[name.toUpperCase() + '_PREFIX'] || '';
+    if (prefix && prefix.slice(-1) !== '.') {
+      prefix += '.';
+    }
+
+    return [name, { password, tags, prefix }];
   });
 
   return _.object(apps);

@@ -1,10 +1,10 @@
 {
-  "name": "datadog-drain",
+  "name": "heroku-datadog-drain",
   "version": "0.0.1",
   "description": "",
   "scripts": {
     "start": "./node_modules/.bin/babel-node app.js",
-    "test": "mocha test/**.js"
+    "test": "mocha --compilers js:babel/register app.test.js"
   },
   "author": "Hrafn Eiriksson <hrafn@oz.com>, Sveinn Fannar Kristjansson <sveinn@oz.com>",
   "license": "ISC",
