@@ -1,16 +1,22 @@
 # Heroku Datadog Drain
 
-Feed your Heroku metrics into DataDog using StatsD.
+Funnel metrics from multiple Heroku apps into DataDog using statsd.
 
 ## Get Started
+```bash
+git clone git@github.com:ozinc/heroku-datadog-drain.git
+cd heroku-datadog-drain
+heroku create
+heroku config:set ALLOWED_APPS=<your-app-slug> <YOUR-APP-SLUG>_PASSWORD=topsecret
+git push heroku master
+heroku ps:scale web=1
+heroku drains:add https://<this-log-drain-app-slug>.herokuapp.com/ --app <your-app-slug>
+```
 
 ## Configuration
-
-## Action Plan (should not be commited)
-1. Get some example data
-2. Set up tests that emulate Heroku Logplex
-3. Parse router metrics
-4. Parse dyno metrics
-5. Parse postgres metrics
-6. Hardcode prefix & tags per heroku app id
-[7. Read prefix & tags from logs]
+```bash
+ALLOWED_APPS=my-app,..    # Required. Comma seperated list of app names
+<APP-NAME>_PASSWORD=..    # Required. One per allowed app where <APP-NAME> corresponds to an app name from ALLOWED_APPS
+<APP-NAME>_TAGS=mytag,..  # Optional. Comma seperated list of default tags for each app
+STATSD_URL=..             # Optional. Default: statsd://localhost:8125
+```
