@@ -10,6 +10,7 @@
   "author": "Hrafn Eiriksson <hrafn@oz.com>, Sveinn Fannar Kristjansson <sveinn@oz.com>",
   "license": "ISC",
   "dependencies": {
+    "basic-auth": "^1.0.0",
     "express": "^4.12.3",
     "lodash": "^3.6.0",
     "logfmt": "^1.2.0",
