@@ -7,10 +7,10 @@ Funnel metrics from multiple Heroku apps into DataDog using statsd.
 git clone git@github.com:ozinc/heroku-datadog-drain.git
 cd heroku-datadog-drain
 heroku create
-heroku config:set ALLOWED_APPS=<your-app-slug> <YOUR-APP-SLUG>_PASSWORD=topsecret
+heroku config:set ALLOWED_APPS=<your-app-slug> <YOUR-APP-SLUG>_PASSWORD=<password>
 git push heroku master
 heroku ps:scale web=1
-heroku drains:add https://<this-log-drain-app-slug>.herokuapp.com/ --app <your-app-slug>
+heroku drains:add https://<your-app-slug>:<password>@<this-log-drain-app-slug>.herokuapp.com/ --app <your-app-slug>
 ```
 
 ## Configuration
