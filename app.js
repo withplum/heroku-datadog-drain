@@ -12,8 +12,7 @@ let statsd = new StatsD(parseStatsdUrl(process.env.STATSD_URL));
 let app = module.exports = express();
 app.use(logfmt.bodyParserStream());
 
-let apps = loadAppsFromEnv();
-console.log(apps);
+let allowedApps = loadAllowedAppsFromEnv();
 
 /**
  * Express app
@@ -21,7 +20,7 @@ console.log(apps);
 
 app.use(function authenticate (req, res, next) {
   let auth = basicAuth(req) || {};
-  let app = apps[auth.name];
+  let app = allowedApps[auth.name];
   if (app !== undefined && app.password === auth.pass) {
     req.defaultTags = app.tags;
     next();
@@ -45,68 +44,44 @@ app.listen(port, function () {
 
 
 /**
- * Rules that specify what lines to process and how to process them
- * {
- *  <rule name>: {
- *    predicate: fn(line) -> bool
- *    process: fn(line)
- *  }, ..
- * }
- */
-let rules = {
-  dyno: {
-    predicate: line => hasKeys(line, ['heroku', 'source', 'dyno']),
-    process: function (line, defaultTags) {
-      let tags = tagsToArr({ dyno: line.source });
-      tags = _.union(tags, defaultTags);
-      let metrics = _.pick(line, (_, key) => key.startsWith('sample#'));
-      _.forEach(metrics, function (value, key) {
-        key = key.split('#')[1];
-        key = key.replace(/_/g, '.');
-        statsd.histogram('heroku.dyno.' + key, value, tags);
-      });
-    }
-  },
-
-  router: {
-    predicate: line => hasKeys(line, ['heroku', 'router', 'path', 'method', 'dyno', 'status', 'connect', 'service', 'at']),
-    process: function (line, defaultTags) {
-      let tags = tagsToArr(_.pick(line, ['dyno', 'method', 'status', 'path', 'host', 'code', 'desc', 'at']));
-      tags = _.union(tags, defaultTags);
-      statsd.histogram('heroku.router.request.connect', line.connect, tags);
-      statsd.histogram('heroku.router.request.service', line.service, tags);
-      if (line.at === 'error') {
-        statsd.increment('heroku.router.error', 1, tags);
-      }
-    }
-  },
-
-  postgres: {
-    predicate: line => hasKeys(line, ['source', 'heroku-postgres']),
-    process: function (line, defaultTags) {
-      let tags = tagsToArr({ source: line.source });
-      tags = _.union(tags, defaultTags);
-      let metrics = _.pick(line, (_, key) => key.startsWith('sample#'));
-      _.forEach(metrics, function (value, key) {
-        key = key.split('#')[1];
-        statsd.histogram('heroku.postgres.' + key, value, tags);
-      });
-    }
-  },
-};
-
-
-/**
  * Matches a line against a rule and processes it
  * @param {object} line
  */
 function processLine (line, defaultTags) {
-  _.forEach(rules, function (rule, name) {
-    if (rule.predicate(line)) {
-      rule.process(line, defaultTags);
-      return true; // Line is processed, we don't have to keep on matching
+  // Dyno metrics
+  if (hasKeys(line, ['heroku', 'source', 'dyno'])) {
+    let tags = tagsToArr({ dyno: line.source });
+    tags = _.union(tags, defaultTags);
+    let metrics = _.pick(line, (_, key) => key.startsWith('sample#'));
+    _.forEach(metrics, function (value, key) {
+      key = key.split('#')[1];
+      key = key.replace(/_/g, '.');
+      statsd.histogram('heroku.dyno.' + key, value, tags);
+    });
+  }
+
+  // Router metrics
+  else if (hasKeys(line, ['heroku', 'router', 'path', 'method', 'dyno', 'status', 'connect', 'service', 'at'])) {
+    let tags = tagsToArr(_.pick(line, ['dyno', 'method', 'status', 'path', 'host', 'code', 'desc', 'at']));
+    tags = _.union(tags, defaultTags);
+    statsd.histogram('heroku.router.request.connect', line.connect, tags);
+    statsd.histogram('heroku.router.request.service', line.service, tags);
+    if (line.at === 'error') {
+      statsd.increment('heroku.router.error', 1, tags);
     }
-  });
+  }
+
+  // Postgres metrics
+  else if (hasKeys(line, ['source', 'heroku-postgres'])) {
+    let tags = tagsToArr({ source: line.source });
+    tags = _.union(tags, defaultTags);
+    let metrics = _.pick(line, (_, key) => key.startsWith('sample#'));
+    _.forEach(metrics, function (value, key) {
+      key = key.split('#')[1];
+      statsd.histogram('heroku.postgres.' + key, value, tags);
+      // TODO: Use statsd counters or gauges for some postgres metrics (db size, table count, ..)
+    });
+  }
 }
 
 /**
@@ -142,20 +117,19 @@ function hasKeys (object, keys) {
   return _.every(keys, _.partial(_.has, object));
 }
 
-
 /**
- * Construct an apps object from the environment vars containing
+ * Construct allowed apps object from the environment vars containing
  * names, passwords and default tags for apps that may use the drain
  */
-function loadAppsFromEnv () {
-  assert(process.env.ALLOWED_APPS);
+function loadAllowedAppsFromEnv () {
+  assert(process.env.ALLOWED_APPS, 'Environment variable ALLOWED_APPS required');
   let appNames = process.env.ALLOWED_APPS.split(',');
   let apps = appNames.map(function (name) {
-    var nameUpper = name.toUpperCase();
-    assert(process.env[nameUpper + '_PASSWORD']);
+    var passwordEnvName = name.toUpperCase() + '_PASSWORD';
+    assert(process.env[passwordEnvName], 'Environment variable ' + passwordEnvName + ' required');
     return [name, {
-      password: process.env[nameUpper + '_PASSWORD'],
-      tags: (process.env[nameUpper + '_TAGS'] || '').split(',')
+      password: process.env[passwordEnvName],
+      tags: (process.env[name.toUpperCase() + '_TAGS'] || '').split(',')
     }];
   });
   return _.object(apps);
