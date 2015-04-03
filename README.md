@@ -18,5 +18,7 @@ heroku drains:add https://<this-log-drain-app-slug>.herokuapp.com/ --app <your-a
 ALLOWED_APPS=my-app,..    # Required. Comma seperated list of app names
 <APP-NAME>_PASSWORD=..    # Required. One per allowed app where <APP-NAME> corresponds to an app name from ALLOWED_APPS
 <APP-NAME>_TAGS=mytag,..  # Optional. Comma seperated list of default tags for each app
+<APP-NAME>_PREFIX=yee     # Optional. String to be prepended to all metrics from a given app
 STATSD_URL=..             # Optional. Default: statsd://localhost:8125
+DEBUG=                    # Optional. If DEBUG is set, a lot of stuff will be logged :)
 ```
