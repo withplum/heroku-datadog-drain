@@ -42,15 +42,15 @@ describe('Heroku Datadog Drain', function () {
     .expect('OK')
     .then(function () {
       expect(StatsD.prototype.histogram.args).to.deep.equal([
-        ['heroku.router.request.connect', '1ms', ['dyno:web.1', 'method:POST', 'status:201', 'path:/users', 'host:myapp.com', 'at:info', 'default:tag']],
-        ['heroku.router.request.service', '37ms', ['dyno:web.1', 'method:POST', 'status:201', 'path:/users', 'host:myapp.com', 'at:info', 'default:tag']],
-        ['heroku.router.request.connect', '1ms', ['dyno:web.2', 'method:GET', 'status:200', 'path:/users/me/tasks', 'host:myapp.com', 'at:info', 'default:tag']],
-        ['heroku.router.request.service', '64ms', ['dyno:web.2', 'method:GET', 'status:200', 'path:/users/me/tasks', 'host:myapp.com', 'at:info', 'default:tag']],
-        ['heroku.router.request.connect', '6ms', ['dyno:web.1', 'method:GET', 'status:503', 'path:/', 'host:myapp.com', 'code:H12', 'desc:Request timeout', 'at:error', 'default:tag']],
-        ['heroku.router.request.service', '30001ms', ['dyno:web.1', 'method:GET', 'status:503', 'path:/', 'host:myapp.com', 'code:H12', 'desc:Request timeout', 'at:error', 'default:tag']],
+        ['heroku.router.request.connect', '1ms', ['dyno:web.1', 'method:POST', 'status:201', 'path:/users', 'host:myapp.com', 'at:info', 'default:tag', 'app:test-app']],
+        ['heroku.router.request.service', '37ms', ['dyno:web.1', 'method:POST', 'status:201', 'path:/users', 'host:myapp.com', 'at:info', 'default:tag', 'app:test-app']],
+        ['heroku.router.request.connect', '1ms', ['dyno:web.2', 'method:GET', 'status:200', 'path:/users/me/tasks', 'host:myapp.com', 'at:info', 'default:tag', 'app:test-app']],
+        ['heroku.router.request.service', '64ms', ['dyno:web.2', 'method:GET', 'status:200', 'path:/users/me/tasks', 'host:myapp.com', 'at:info', 'default:tag', 'app:test-app']],
+        ['heroku.router.request.connect', '6ms', ['dyno:web.1', 'method:GET', 'status:503', 'path:/', 'host:myapp.com', 'code:H12', 'desc:Request timeout', 'at:error', 'default:tag', 'app:test-app']],
+        ['heroku.router.request.service', '30001ms', ['dyno:web.1', 'method:GET', 'status:503', 'path:/', 'host:myapp.com', 'code:H12', 'desc:Request timeout', 'at:error', 'default:tag', 'app:test-app']],
       ]);
       expect(StatsD.prototype.increment.args).to.deep.equal([
-        ['heroku.router.error', 1, ['dyno:web.1', 'method:GET', 'status:503', 'path:/', 'host:myapp.com', 'code:H12', 'desc:Request timeout', 'at:error', 'default:tag']],
+        ['heroku.router.error', 1, ['dyno:web.1', 'method:GET', 'status:503', 'path:/', 'host:myapp.com', 'code:H12', 'desc:Request timeout', 'at:error', 'default:tag', 'app:test-app']],
       ]);
     });
   });
@@ -66,15 +66,15 @@ describe('Heroku Datadog Drain', function () {
     .expect('OK')
     .then(function () {
       expect(StatsD.prototype.histogram.args).to.deep.equal([
-        ['heroku.dyno.load.avg.1m', '0.01', ['dyno:web.1', 'default:tag']],
-        ['heroku.dyno.load.avg.5m', '0.02', ['dyno:web.1', 'default:tag']],
-        ['heroku.dyno.load.avg.15m', '0.03', ['dyno:web.1', 'default:tag']],
-        ['heroku.dyno.memory.total', '103.50MB', ['dyno:web.1', 'default:tag']],
-        ['heroku.dyno.memory.rss', '94.70MB', ['dyno:web.1', 'default:tag']],
-        ['heroku.dyno.memory.cache', '0.32MB', ['dyno:web.1', 'default:tag']],
-        ['heroku.dyno.memory.swap', '8.48MB', ['dyno:web.1', 'default:tag']],
-        ['heroku.dyno.memory.pgpgin', '36091pages', ['dyno:web.1', 'default:tag']],
-        ['heroku.dyno.memory.pgpgout', '11765pages', ['dyno:web.1', 'default:tag']]
+        ['heroku.dyno.load.avg.1m', '0.01', ['dyno:web.1', 'default:tag', 'app:test-app']],
+        ['heroku.dyno.load.avg.5m', '0.02', ['dyno:web.1', 'default:tag', 'app:test-app']],
+        ['heroku.dyno.load.avg.15m', '0.03', ['dyno:web.1', 'default:tag', 'app:test-app']],
+        ['heroku.dyno.memory.total', '103.50MB', ['dyno:web.1', 'default:tag', 'app:test-app']],
+        ['heroku.dyno.memory.rss', '94.70MB', ['dyno:web.1', 'default:tag', 'app:test-app']],
+        ['heroku.dyno.memory.cache', '0.32MB', ['dyno:web.1', 'default:tag', 'app:test-app']],
+        ['heroku.dyno.memory.swap', '8.48MB', ['dyno:web.1', 'default:tag', 'app:test-app']],
+        ['heroku.dyno.memory.pgpgin', '36091pages', ['dyno:web.1', 'default:tag', 'app:test-app']],
+        ['heroku.dyno.memory.pgpgout', '11765pages', ['dyno:web.1', 'default:tag', 'app:test-app']]
       ]);
     });
   });
@@ -89,22 +89,22 @@ describe('Heroku Datadog Drain', function () {
     .expect('OK')
     .then(function () {
       expect(StatsD.prototype.histogram.args).to.deep.equal([
-        ['heroku.postgres.current_transaction', '6709', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag']],
-        ['heroku.postgres.db_size', '18032824bytes', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag']],
-        ['heroku.postgres.tables', '16', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag']],
-        ['heroku.postgres.active-connections', '4', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag']],
-        ['heroku.postgres.waiting-connections', '0', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag']],
-        ['heroku.postgres.index-cache-hit-rate', '0.99971', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag']],
-        ['heroku.postgres.table-cache-hit-rate', '0.99892', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag']],
-        ['heroku.postgres.load-avg-1m', '0.315', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag']],
-        ['heroku.postgres.load-avg-5m', '0.22', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag']],
-        ['heroku.postgres.load-avg-15m', '0.225', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag']],
-        ['heroku.postgres.read-iops', '25.996', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag']],
-        ['heroku.postgres.write-iops', '1.629', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag']],
-        ['heroku.postgres.memory-total', '15666128kB', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag']],
-        ['heroku.postgres.memory-free', '233092kB', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag']],
-        ['heroku.postgres.memory-cached', '14836812kB', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag']],
-        ['heroku.postgres.memory-postgres', '170376kB', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag']]
+        ['heroku.postgres.current_transaction', '6709', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag', 'app:test-app']],
+        ['heroku.postgres.db_size', '18032824bytes', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag', 'app:test-app']],
+        ['heroku.postgres.tables', '16', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag', 'app:test-app']],
+        ['heroku.postgres.active-connections', '4', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag', 'app:test-app']],
+        ['heroku.postgres.waiting-connections', '0', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag', 'app:test-app']],
+        ['heroku.postgres.index-cache-hit-rate', '0.99971', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag', 'app:test-app']],
+        ['heroku.postgres.table-cache-hit-rate', '0.99892', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag', 'app:test-app']],
+        ['heroku.postgres.load-avg-1m', '0.315', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag', 'app:test-app']],
+        ['heroku.postgres.load-avg-5m', '0.22', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag', 'app:test-app']],
+        ['heroku.postgres.load-avg-15m', '0.225', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag', 'app:test-app']],
+        ['heroku.postgres.read-iops', '25.996', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag', 'app:test-app']],
+        ['heroku.postgres.write-iops', '1.629', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag', 'app:test-app']],
+        ['heroku.postgres.memory-total', '15666128kB', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag', 'app:test-app']],
+        ['heroku.postgres.memory-free', '233092kB', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag', 'app:test-app']],
+        ['heroku.postgres.memory-cached', '14836812kB', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag', 'app:test-app']],
+        ['heroku.postgres.memory-postgres', '170376kB', ['source:HEROKU_POSTGRESQL_TEAL', 'default:tag', 'app:test-app']]
       ]);
     });
   });

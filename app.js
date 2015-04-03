@@ -10,14 +10,9 @@ let StatsD = require('node-statsd');
 let basicAuth = require('basic-auth');
 let statsd = new StatsD(parseStatsdUrl(process.env.STATSD_URL));
 let app = module.exports = express();
-app.use(logfmt.bodyParserStream());
-
 let allowedApps = loadAllowedAppsFromEnv();
 
-/**
- * Express app
- */
-
+app.use(logfmt.bodyParserStream());
 app.use(function authenticate (req, res, next) {
   let auth = basicAuth(req) || {};
   let app = allowedApps[auth.name];
@@ -125,13 +120,19 @@ function loadAllowedAppsFromEnv () {
   assert(process.env.ALLOWED_APPS, 'Environment variable ALLOWED_APPS required');
   let appNames = process.env.ALLOWED_APPS.split(',');
   let apps = appNames.map(function (name) {
+    // Password
     var passwordEnvName = name.toUpperCase() + '_PASSWORD';
-    assert(process.env[passwordEnvName], 'Environment variable ' + passwordEnvName + ' required');
-    return [name, {
-      password: process.env[passwordEnvName],
-      tags: (process.env[name.toUpperCase() + '_TAGS'] || '').split(',')
-    }];
+    var password = process.env[passwordEnvName];
+    assert(password, 'Environment variable ' + passwordEnvName + ' required');
+
+    // Tags
+    var tags = process.env[name.toUpperCase() + '_TAGS'];
+    tags = tags === undefined ? [] : tags.split(',');
+    tags.push('app:' + name);
+
+    return [name, { password, tags }];
   });
+
   return _.object(apps);
 }
 
