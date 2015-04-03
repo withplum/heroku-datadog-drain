@@ -10,6 +10,7 @@ var statsd = new StatsD(parseStatsdUrl(process.env.STATSD_URL));
 var app = module.exports = express();
 app.use(logfmt.bodyParserStream());
 
+
 /**
   * Scratch Pad
   * 1. Get some example data
@@ -23,22 +24,16 @@ app.use(logfmt.bodyParserStream());
 */
 
 /**
- * Log endpoint
+ * Express app
  */
 app.post('/', function (req, res) {
-  if(req.body === undefined) {
-    return res.send('OK');
+  if(req.body !== undefined) {
+    req.body.pipe(through(processLine));
   }
-
-  req.body.pipe(through(processLine));
 
   res.send('OK');
 });
 
-
-/**
- * Start server
- */
 var port = process.env.PORT || 3000;
 app.listen(port, function () {
   console.log('Server listening on port ' + port);
@@ -56,11 +51,10 @@ app.listen(port, function () {
  */
 var rules = {
   dynoRuntimeMetrics: {
-    predicate: function isDynoRuntimeLine (line) {
-      // Contains the keys heroku, source, dyno and sample#*
-      return hasKeys(line, ['heroku', 'source', 'dyno']) && _.some(line, (_, key) => key.startsWith('sample#'));
+    predicate: function (line) {
+      return hasKeys(line, ['heroku', 'source', 'dyno']);
     },
-    process: function processDynoRuntimeLine (line) {
+    process: function (line) {
       var tags = tagsToArr({ dyno: line.source });
       var metrics = _.pick(line, (_, key) => key.startsWith('sample#'));
       _.forEach(metrics, function (value, key) {
@@ -73,14 +67,31 @@ var rules = {
 
   routerResponseMetrics: {
     predicate: function (line) {
-      return line.at === 'info' && hasKeys(line, ['heroku', 'router', 'path', 'method', 'dyno', 'status', 'connect', 'service']);
+      return hasKeys(line, ['heroku', 'router', 'path', 'method', 'dyno', 'status', 'connect', 'service', 'at']);
     },
     process: function (line) {
-      var tags = tagsToArr(_.pick(line, ['dyno', 'method', 'status', 'path', 'host']));
+      var tags = tagsToArr(_.pick(line, ['dyno', 'method', 'status', 'path', 'host', 'code', 'desc', 'at']));
       statsd.histogram('heroku.router.request.connect', line.connect, tags);
       statsd.histogram('heroku.router.request.service', line.service, tags);
+      if (line.at === 'error') {
+        statsd.increment('heroku.router.error', 1, tags);
+      }
     }
-  }
+  },
+
+  postgresMetrics: {
+    predicate: function (line) {
+      return hasKeys(line, ['source', 'heroku-postgres']);
+    },
+    process: function (line) {
+      var tags = tagsToArr({ source: line.source });
+      var metrics = _.pick(line, (_, key) => key.startsWith('sample#'));
+      _.forEach(metrics, function (value, key) {
+        key = key.split('#')[1];
+        statsd.histogram('heroku.postgres.' + key, value, tags);
+      });
+    }
+  },
 };
 
 
