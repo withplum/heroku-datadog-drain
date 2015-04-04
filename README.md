@@ -2,6 +2,13 @@
 
 Funnel metrics from multiple Heroku apps into DataDog using statsd.
 
+
+Supported Heroku metrics:
+- Heroku Router response times, status codes, etc.
+- Application errors
+- Heroku Postgres metrics
+- Heroku Dyno [runtime metrics](https://devcenter.heroku.com/articles/log-runtime-metrics)
+
 ## Get Started
 ```bash
 git clone git@github.com:ozinc/heroku-datadog-drain.git
