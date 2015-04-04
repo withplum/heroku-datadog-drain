@@ -17,13 +17,6 @@ if (process.env.DEBUG) {
   statsd.send = wrap(statsd.send.bind(statsd), console.log.bind(null, 'Intercepted: statsd.send(%s):'));
 }
 
-function wrap (fn, wrapper) {
-  return function (...args) {
-    wrapper(...args);
-    fn.apply(null, args);
-  };
-}
-
 app.use(logfmt.bodyParserStream());
 app.use(function authenticate (req, res, next) {
   let auth = basicAuth(req) || {};
@@ -70,7 +63,7 @@ function processLine (line, prefix, defaultTags) {
     _.forEach(metrics, function (value, key) {
       key = key.split('#')[1];
       key = key.replace(/_/g, '.');
-      statsd.histogram(prefix + 'heroku.dyno.' + key, value, tags);
+      statsd.histogram(prefix + 'heroku.dyno.' + key, extractNumber(value), tags);
     });
   }
 
@@ -81,8 +74,8 @@ function processLine (line, prefix, defaultTags) {
     }
     let tags = tagsToArr(_.pick(line, ['dyno', 'method', 'status', 'path', 'host', 'code', 'desc', 'at']));
     tags = _.union(tags, defaultTags);
-    statsd.histogram(prefix + 'heroku.router.request.connect', line.connect, tags);
-    statsd.histogram(prefix + 'heroku.router.request.service', line.service, tags);
+    statsd.histogram(prefix + 'heroku.router.request.connect', extractNumber(line.connect), tags);
+    statsd.histogram(prefix + 'heroku.router.request.service', extractNumber(line.service), tags);
     if (line.at === 'error') {
       statsd.increment(prefix + 'heroku.router.error', 1, tags);
     }
@@ -98,7 +91,7 @@ function processLine (line, prefix, defaultTags) {
     let metrics = _.pick(line, (_, key) => key.startsWith('sample#'));
     _.forEach(metrics, function (value, key) {
       key = key.split('#')[1];
-      statsd.histogram(prefix + 'heroku.postgres.' + key, value, tags);
+      statsd.histogram(prefix + 'heroku.postgres.' + key, extractNumber(value), tags);
       // TODO: Use statsd counters or gauges for some postgres metrics (db size, table count, ..)
     });
   }
@@ -172,5 +165,31 @@ function loadAllowedAppsFromEnv () {
   });
 
   return _.object(apps);
+}
+
+/**
+ * 
+ */
+function extractNumber (string) {
+  if (typeof string === 'string') {
+    var match = string.match(/[\d\.]+/);
+    if (match !== null && match.length > 0) {
+      return Number(match[0]);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Wrap a function with another function
+ * @param {function} fn
+ * @param {function} wrapper
+ * @return {function}
+ */
+function wrap (fn, wrapper) {
+  return function (...args) {
+    wrapper(...args);
+    fn.apply(null, args);
+  };
 }
 
