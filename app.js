@@ -96,6 +96,19 @@ function processLine (line, prefix, defaultTags) {
     });
   }
 
+  // Scaling event
+  else if (line.api === true && line.Scale === true) {
+    if (process.env.DEBUG) {
+      console.log('Processing scaling metrics');
+    }
+    let tags = defaultTags;
+    _.forEach(line, function (value, key) {
+      if (value !== true && parseInt(value)) {
+          statsd.gauge(prefix + 'heroku.dyno.' + key, parseInt(value), tags);
+      }
+    });
+  }
+
   // Default
   else {
     if (process.env.DEBUG) {

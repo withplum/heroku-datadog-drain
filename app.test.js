@@ -108,4 +108,26 @@ describe('Heroku Datadog Drain', function () {
       ]);
     });
   });
+
+  it('sends dyno scaling metrics and events to statsd', function () {
+    sinon.spy(StatsD.prototype, 'gauge');
+    return request(app)
+    .post('/')
+    .auth('test-app', 'test-pass')
+    .set('Content-type', 'application/logplex-1')
+    .send('222 <134>1 2015-04-07T16:01:43.517062+00:00 host heroku api - Scale to mailer=1, web=3 by someuser@gmail.com')
+    .expect(200)
+    .expect('OK')
+    .then(function () {
+      expect(StatsD.prototype.gauge.args).to.exist;
+      expect(StatsD.prototype.gauge.args).to.deep.equal([
+        ['heroku.dyno.mailer', 1, ['default:tag', 'app:test-app']],
+        ['heroku.dyno.web', 3, ['default:tag', 'app:test-app']]
+      ]);
+      // TODO: Also send datadog event
+    })
+    .finally(function () {
+      StatsD.prototype.gauge.restore();
+    });
+  });
 });
