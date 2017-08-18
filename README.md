@@ -29,3 +29,7 @@ ALLOWED_APPS=my-app,..    # Required. Comma seperated list of app names
 STATSD_URL=..             # Optional. Default: statsd://localhost:8125
 DEBUG=                    # Optional. If DEBUG is set, a lot of stuff will be logged :)
 ```
+
+## Datadog buildpack
+
+This drain users the Datadog buildpack to run a local statsd daemon.
